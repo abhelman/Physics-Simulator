@@ -23,7 +23,7 @@ double cVals[] = { 0.0,0.0,3.14,0.0,0.0 };
 double kVals[] = { 1000.0, 5000.0,5000.0,20000.0,0.0 };
 double edgeLength = 0.1;
 int COM = 11;
-double height = 10.0;
+double height = 4.0;
 int EMPTY = 4;
 
 
@@ -105,12 +105,12 @@ public:
         double norm = sqrt(vx * vx + vz * vz);
 
         if (y < BASE) {
-            if (norm > 0) {
+            if (norm > 0) { // if moving, kinetic friction
                 Fx -= (vx / norm) * 1.0 * 0.57 * abs(Fy);
                 Fz -= (vz / norm) * 1.0 * 0.57 * abs(Fy);
 
             }
-            else {
+            else { // not moving, apply static friction
                 if (abs(Fy) * 0.74 > sqrt(Fx * Fx + Fz * Fz)) {
                     Fx = 0.0;
                     Fz = 0.0;
@@ -316,23 +316,69 @@ class Platform {
 
 class Robot {
     private:
-public:
-    std::vector<Mass> massPositions;
-    std::vector<Spring> springs;
-    Sphere sphere = Sphere(0.015,36.0f,18.0f);
-    // 0.1 basic string length
-    Rod rod = Rod();
+    public:
+        std::vector<Mass> massPositions;
+        std::vector<Spring> springs;
+        Sphere sphere = Sphere(0.015,36.0f,18.0f);
+        // 0.1 basic string length
+        Rod rod = Rod();
 
         Robot(int l, int w, int h, std::vector<double>& encoding) {
             rod.set(0.002f, 36.0f, 18.0f, edgeLength / 36.0f);
-            float x = BASE;
-            float y, z;
+            //float x = BASE;
+            //float y, z;
             // masses in one row
-            int m = (l + 1);
+            //int m = (l + 1);
             // total masses
-            int masses = m*(w+1) * (h + 1);
+            //int masses = m*(w+1) * (h + 1);
             // height of stack
-            for (int a = h; a >= 0; a--) {
+            
+            float x = 0.05;
+            float y, z;
+            int masses = 32;
+            int m = 8;
+            int n = 2;
+            for (int i = 0; i < masses; i += m) {
+                z = 0.05;
+                for (int j = 0; j < m; j += n) {
+                    y = BASE + height + 0.2;
+                    for (int k = 0; k < n; k++) {
+                        massPositions.push_back(Mass(0.1, x, y, z, 0));
+                        //printf("%f %f %f, ", x, y, z);
+                        y = BASE + height + 0.1;
+                    }
+                    z -= 0.1;
+                }
+                x -= 0.1;
+            }
+
+
+            x += 0.1;
+            z += 0.1;
+            for (int i = 0; i >= 0; i--) {
+                y = BASE + height + i * 0.1;
+                massPositions.push_back(Mass(0.1, 0.05, y, 0.05, 1));
+                massPositions.push_back(Mass(0.1, 0.05, y, -0.05, 1));
+                massPositions.push_back(Mass(0.1, -0.05, y, 0.05, 1));
+                massPositions.push_back(Mass(0.1, -0.05, y, -0.05, 1));
+
+                massPositions.push_back(Mass(0.1, 0.05, y, z + 0.1, 1));
+                massPositions.push_back(Mass(0.1, 0.05, y, z, 1));
+                massPositions.push_back(Mass(0.1, -0.05, y, z + 0.1, 1));
+                massPositions.push_back(Mass(0.1, -0.05, y, z, 1));
+
+                massPositions.push_back(Mass(0.1, x, y, 0.05, 0));
+                massPositions.push_back(Mass(0.1, x, y, -0.05, 0));
+                massPositions.push_back(Mass(0.1, x + 0.1, y, 0.05, 0));
+                massPositions.push_back(Mass(0.1, x + 0.1, y, -0.05, 0));
+
+                massPositions.push_back(Mass(0.1, x, y, z + 0.1, 0));
+                massPositions.push_back(Mass(0.1, x, y, z, 0));
+                massPositions.push_back(Mass(0.1, x + 0.1, y, z + 0.1, 0));
+                massPositions.push_back(Mass(0.1, x + 0.1, y, z, 0));
+            }
+
+            /*for (int a = h; a >= 0; a--) {
                 y = BASE + height + edgeLength * a;
                 x = BASE;
                 for (int i = 0; i < m * (w + 1); i += m) {
@@ -344,13 +390,13 @@ public:
                     x += 0.1;
                 }
             }
-
+            */
             std::vector<int> indexes;
-            int i = 0;
+            /*int i = 0;
 
             double dx, dy, dz;
-            while (i < masses) {
-                for (int j = i+1; j < masses; j++) {
+            while (i < massPositions.size()) {
+                for (int j = i+1; j < massPositions.size(); j++) {
                     dx = massPositions[i].x - massPositions[j].x;
                     dy = massPositions[i].y - massPositions[j].y;
                     dz = massPositions[i].z - massPositions[j].z;
@@ -359,6 +405,53 @@ public:
                     }
                 }
                i += 1;
+            }*/
+
+            int i = 0;
+            int skip = 0;
+            double dx, dy, dz;
+
+            while (i < masses - m) {
+                indexes = { i, i + 1, i + 2, i + 3, i + m, i + 1 + m,i + 2 + m, i + 3 + m };
+                for (int j = 0; j < indexes.size(); j++) {
+                    for (int k = 0; k < j; k++) {
+                        springs.push_back(Spring(&(massPositions[indexes[j]]), &(massPositions[indexes[k]])));
+                    }
+                }
+                skip++;
+                if (skip == 3) {
+                    skip = 0;
+                    i += 2;
+                }
+                i += 2;
+            }
+            skip = 0;
+            i = masses;
+            while (i < massPositions.size()) {
+                if (skip < 4) {
+                    if (skip == 0) {
+                        indexes = { i, i + 1, i + 2, i + 3, 1, 3, 9, 11 };
+                    }
+                    if (skip == 1) {
+                        indexes = { i, i + 1, i + 2, i + 3, 5, 7, 13, 15 };
+                    }
+                    if (skip == 2) {
+                        indexes = { i, i + 1, i + 2, i + 3, 17, 19, 25, 27 };
+                    }
+                    if (skip == 3) {
+                        indexes = { i, i + 1, i + 2, i + 3, 21, 23, 29, 31 };
+                    }
+                }
+                else {
+                    indexes = { i, i + 1, i + 2, i + 3, i - 16, i - 15, i - 14, i - 13 };
+                }
+                for (int j = 0; j < indexes.size(); j++) {
+                    for (int k = 0; k < j; k++) {
+                        springs.push_back(Spring(&(massPositions[indexes[j]]), &(massPositions[indexes[k]])));
+                    }
+                }
+                skip++;
+                i += 4;
             }
             
             double bestFit, group, newFit;
@@ -510,8 +603,8 @@ int main()
     glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
     glm::mat4 view = glm::mat4(1.0f);
     glm::mat4 projection = glm::mat4(1.0f);
-    view = glm::translate(view, glm::vec3(0.0f, 0.0f, -4.0f));
-    view = glm::rotate(view, glm::radians(20.0f), glm::vec3(1.0f, 1.0f, 0.0f));
+    view = glm::translate(view, glm::vec3(0.0f,0.0f, -4.0f));
+    view = glm::rotate(view, glm::radians(10.0f), glm::vec3(1.0f, 1.0f, 0.0f));
 
     projection = glm::perspective(glm::radians(45.0f), (float)(1600) / (float)(1200), 0.1f, 100.0f);
     // retrieve the matrix uniform locations
@@ -531,6 +624,10 @@ int main()
     //std::vector<double> encoding3 = { 2, 0.0309603, -0.106138, -0.356798, 1, 0.170042, 0.142722, 0.0083635, 0, -0.25831, -0.0742616, -0.29498, 3, 0.182249, -0.31517, 0.0578691, 0, 0.148946, -0.301853, 0.0563522, 1, -0.0179736, 0.145622, 0.185604, 4, -0.040763, -0.258199, -0.1144, 2, 0.19824, -0.326341, -0.189295, 1, 0.00951487, -0.283962, -0.142605, };
     // instance 1 0.0215
     std::vector<double> encoding3 = { 4, -0.207362, -0.292036+height, -0.252469, 1, 0.118805, -0.239553 + height, -0.110972, 2, -0.170515, -0.0986156 + height, -0.185227, 1, -0.382845, 0.206599 + height, -0.361608, 2, -0.293663, -0.102109 + height, -0.0689958, 1, -0.302256, 0.0206676 + height, 0.0664337, 1,-0.0916627, -0.394442 + height, -0.14061, 4, -0.192837, -0.236811 + height, -0.0827886, 4, -0.30359, -0.263236 + height, -0.293268, };
+    //std::vector<double> encoding = { 2, -0.293228, 0.00408948 + height, -0.30795, 1, -0.341533, -0.308866 + height, 0.00399792, 2, 0.171215, 0.110843 + height, 0.0296863, 1, 0.14406, 0.196228 + height, -0.391137 };
+    std::vector<double> encoding = { 1, 0.17911, -0.0289987 + height, -0.166724, 3, -0.233963 , -0.208301 + height, 0.026191, 1, -0.117753, -0.261213+height, 0.0163396, 2, 0.154416, -0.0125401+height, -0.0380078, 2, -0.133061, -0.030427+height, 0.112363, 2, -0.180706, 0.0765206+height, -0.225935, };
+
+    
     
     double PE;
     double KE;
@@ -544,7 +641,7 @@ int main()
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     Robot robot1(3,3,3,encoding1);
     Robot robot2(3, 3, 3, encoding2);
-    Robot robot3(3, 3, 3, encoding3);
+    Robot robot3(3, 3, 3, encoding);
 
     while (time < 10.0 && !glfwWindowShouldClose(window))
     {
